@@ -1,8 +1,18 @@
 function Prepare-Environment {
     param(
-        [string]$ip,
-        [string]$dns
+        [string]$ip = $env:DEPLOY_STF_IP,
+        [string]$dns = $env:DEPLOY_STF_DNS
     )
+
+    if (-not $ip) {
+        $ip = "192.168.18.27"
+        [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_IP", $ip, [System.EnvironmentVariableTarget]::User)
+    }
+
+    if (-not $dns) {
+        $dns = "192.168.18.1"
+        [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_DNS", $dns, [System.EnvironmentVariableTarget]::User)
+    }
 
     Install-Chocolatey
 
@@ -33,8 +43,8 @@ function Prepare-Environment {
     }
 
     try {
-        Get-Content nginx.conf.template | ForEach-Object {
-            $_ -replace '__IP_ADDRESS__', $ip -replace '__DNS_ADDRESS__', $dns
+        Get-Content .\config\nginx.conf.template | ForEach-Object {
+            $_ -replace '__IP_ADDRESS__', $env:DEPLOY_STF_IP -replace '__DNS_ADDRESS__', $env:DEPLOY_STF_DNS
         } | Set-Content nginx.conf
     } catch {
         Write-Host "Failed to generate nginx configuration."

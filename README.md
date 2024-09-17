@@ -1,5 +1,3 @@
-Here is the `README` content without markdown formatting:
-
 # STF Deployment Services
 
 This repository contains a set of modular PowerShell scripts designed to automate the deployment of Smartphone Test Farm (STF) services using Docker on a Windows environment. Each script serves a specific purpose, making it easy to maintain, update, and reuse.

@@ -80,8 +80,8 @@ function Run-Docker-Container {
 }
 
 Write-Host "Starting Docker containers..."
-Run-Docker-Container "rethinkdb" "rethinkdb rethinkdb --bind all --cache-size 8192 --http-port 8090"
-Run-Docker-Container "nginx" "nginx -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro"
+Run-Docker-Container "rethinkdb" "rethinkdb --bind all --cache-size 8192 --http-port 8090"
+Run-Docker-Container "nginx" "nginx -v ${pwd}\nginx.conf:/etc/nginx/nginx.conf:ro nginx"
 Run-Docker-Container "stf-migrate" "openstf/stf stf migrate"
 Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf stf storage-plugin-apk --port 3000 --storage-url http://$ip/"
 Run-Docker-Container "storage-plugin-image-3400" "openstf/stf stf storage-plugin-image --port 3000 --storage-url http://$ip/"

@@ -17,8 +17,8 @@ if (-not $dns) {
     Write-Host "Using provided DNS address: $dns"
 }
 
-[System.Environment]::SetEnvironmentVariable("DEPLOY_STF_IP", $ip, [System.EnvironmentVariableTarget]::User)
-[System.Environment]::SetEnvironmentVariable("DEPLOY_STF_DNS", $dns, [System.EnvironmentVariableTarget]::User)
+[System.Environment]::SetEnvironmentVariable("STF_IP", $ip, [System.EnvironmentVariableTarget]::Process)
+[System.Environment]::SetEnvironmentVariable("DNS_ADDRESS", $dns, [System.EnvironmentVariableTarget]::Process)
 
 . .\modules\Install-Chocolatey.ps1
 . .\modules\Install-Tool.ps1
@@ -58,7 +58,8 @@ function Run-Docker-Container {
     param (
         [string]$name,
         [string]$image,
-        [string[]]$options
+        [string[]]$options,
+        [string[]]$cmdArgs = @()
     )
 
     try {
@@ -70,7 +71,7 @@ function Run-Docker-Container {
         }
 
         Write-Host "Running Docker container: $name"
-        docker run -d --name $name $options $image
+        docker run -d --name $name @options $image @cmdArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to run Docker container: $name"
         }
@@ -81,11 +82,28 @@ function Run-Docker-Container {
 }
 
 Write-Host "Starting Docker containers..."
-Run-Docker-Container "rethinkdb" "rethinkdb" "--net=host" "--bind all" "--cache-size 8192" "--http-port 8090"
-$nginxConfigPath = "${pwd}\nginx.conf" -replace '\\', '/' -replace ':', ''
-Run-Docker-Container "nginx" "nginx" "-v /$nginxConfigPath:/etc/nginx/nginx.conf:ro" "--net=host"
-Run-Docker-Container "stf-migrate" "openstf/stf" "stf migrate" "--net=host"
-Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf" "stf storage-plugin-apk --port 3000 --storage-url http://$ip/" "--net=host"
-Run-Docker-Container "storage-plugin-image-3400" "openstf/stf" "stf storage-plugin-image --port 3000 --storage-url http://$ip/" "--net=host"
-Run-Docker-Container "storage-temp-3500" "openstf/stf" "stf storage-temp --port 3000 --save-dir /home/stf" "--net=host"
+
+Run-Docker-Container "rethinkdb" "rethinkdb" @("--net=host") @("rethinkdb", "--bind", "all", "--cache-size", "8192", "--http-port", "8090")
+
+$currentLocation = Get-Location
+
+$nginxConfigPath = (Resolve-Path "$PSScriptRoot\nginx.conf").Path
+$nginxConfigPath = $nginxConfigPath -replace '\\', '/' 
+$nginxConfigPath = $nginxConfigPath -replace '^[A-Za-z]:', { "/$($matches[0].Substring(0, 1).ToLower())" }
+$nginxConfigPath = $nginxConfigPath.Trim()
+$nginxConfigPath = $nginxConfigPath.ToLower()
+
+if ($nginxConfigPath -match '^\s') {
+    Write-Host "Invalid characters detected in the path: '$nginxConfigPath'" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Using nginx config path: '$nginxConfigPath'"
+$nginxVolumeOption = "-v ${nginxConfigPath}:/etc/nginx/nginx.conf:ro"
+Write-Host "Constructed Docker volume option: '$nginxVolumeOption'"
+Run-Docker-Container "nginx" "nginx" @($nginxVolumeOption, "--net=host")
+Run-Docker-Container "stf-migrate" "openstf/stf" @("--net=host") @("stf", "migrate")
+Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf" @("--net=host") @("stf", "storage-plugin-apk", "--port", "3000", "--storage-url", "http://$ip/")
+Run-Docker-Container "storage-plugin-image-3400" "openstf/stf" @("--net=host") @("stf", "storage-plugin-image", "--port", "3000", "--storage-url", "http://$ip/")
+Run-Docker-Container "storage-temp-3500" "openstf/stf" @("--net=host") @("stf", "storage-temp", "--port", "3000", "--save-dir", "/home/stf")
 Write-Host "All components have been started successfully."

@@ -20,10 +20,10 @@ if (-not $dns) {
 [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_IP", $ip, [System.EnvironmentVariableTarget]::User)
 [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_DNS", $dns, [System.EnvironmentVariableTarget]::User)
 
-. .\Install-Chocolatey.ps1
-. .\Install-Tool.ps1
-. .\Prepare-Environment.ps1
-. .\Run-Docker-Container.ps1
+. .\modules\Install-Chocolatey.ps1
+. .\modules\Install-Tool.ps1
+. .\modules\Prepare-Environment.ps1
+. .\modules\Run-Docker-Container.ps1
 
 if (-not (Test-Path "env.ok")) {
     Prepare-Environment -ip $ip -dns $dns

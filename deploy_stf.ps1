@@ -31,7 +31,7 @@ if (-not (Test-Path "env.ok")) {
 
 try {
     Write-Host "Starting ADB server"
-    Start-Process adb -ArgumentList "start-server" -Wait
+    Start-Process adb -ArgumentList "start-server" -NoNewWindow -Wait
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to start ADB server."
     }
@@ -40,7 +40,40 @@ try {
     exit 1
 }
 
-Run-Docker-Container "rethinkdb" "rethinkdb rethinkdb --bind all --cache-size 8192 --http-port 8090"
+function Test-DockerContainerExists {
+    param (
+        [string]$containerName
+    )
+    $result = docker ps -a --filter "name=$containerName" --format "{{.Names}}"
+    return $result -ne ""
+}
+
+function Run-Docker-Container {
+    param (
+        [string]$name,
+        [string]$command
+    )
+
+    try {
+        if (Test-DockerContainerExists -containerName $name) {
+            Write-Host "Removing existing Docker container: $name"
+            docker rm -f $name
+        } else {
+            Write-Host "No existing container named $name. Skipping removal."
+        }
+
+        Write-Host "Running Docker container: $name"
+        docker run -d --name $name --net host $command
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to run Docker container: $name"
+        }
+    } catch {
+        Write-Host $_.Exception.Message
+        exit 1
+    }
+}
+
+Run-Docker-Container "rethinkdb" "rethinkdb --bind all --cache-size 8192 --http-port 8090"
 Run-Docker-Container "nginx" "nginx -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro"
 Run-Docker-Container "stf-migrate" "openstf/stf stf migrate"
 Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf stf storage-plugin-apk --port 3000 --storage-url http://$ip/"

@@ -30,13 +30,19 @@ if (-not (Test-Path "env.ok")) {
 }
 
 try {
-    Write-Host "Starting ADB server"
+    Write-Host "Starting ADB server..."
     Start-Process adb -ArgumentList "start-server" -NoNewWindow -Wait
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to start ADB server."
+    Start-Sleep -Seconds 5
+    $adbStatus = Get-Process adb -ErrorAction SilentlyContinue
+
+    if ($adbStatus) {
+        Write-Host "ADB server started successfully."
+    } else {
+        throw "Failed to verify ADB server start."
     }
 } catch {
     Write-Host "Failed to start ADB server. Ensure ADB is installed correctly."
+    Write-Host $_.Exception.Message
     exit 1
 }
 
@@ -73,7 +79,8 @@ function Run-Docker-Container {
     }
 }
 
-Run-Docker-Container "rethinkdb" "rethinkdb --bind all --cache-size 8192 --http-port 8090"
+Write-Host "Starting Docker containers..."
+Run-Docker-Container "rethinkdb" "rethinkdb rethinkdb --bind all --cache-size 8192 --http-port 8090"
 Run-Docker-Container "nginx" "nginx -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro"
 Run-Docker-Container "stf-migrate" "openstf/stf stf migrate"
 Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf stf storage-plugin-apk --port 3000 --storage-url http://$ip/"

@@ -81,12 +81,11 @@ function Run-Docker-Container {
 }
 
 Write-Host "Starting Docker containers..."
-
-Run-Docker-Container "rethinkdb" "rethinkdb" "--net host --bind all --cache-size 8192 --http-port 8090"
-Run-Docker-Container "nginx" "nginx" "-v ${pwd}\nginx.conf:/etc/nginx/nginx.conf:ro --net host"
-Run-Docker-Container "stf-migrate" "openstf/stf" "stf migrate --net host"
-Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf" "stf storage-plugin-apk --port 3000 --storage-url http://$ip/ --net host"
-Run-Docker-Container "storage-plugin-image-3400" "openstf/stf" "stf storage-plugin-image --port 3000 --storage-url http://$ip/ --net host"
-Run-Docker-Container "storage-temp-3500" "openstf/stf" "stf storage-temp --port 3000 --save-dir /home/stf --net host"
-
+Run-Docker-Container "rethinkdb" "rethinkdb" "--net=host" "--bind all" "--cache-size 8192" "--http-port 8090"
+$nginxConfigPath = "${pwd}\nginx.conf" -replace '\\', '/' -replace ':', ''
+Run-Docker-Container "nginx" "nginx" "-v /$nginxConfigPath:/etc/nginx/nginx.conf:ro" "--net=host"
+Run-Docker-Container "stf-migrate" "openstf/stf" "stf migrate" "--net=host"
+Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf" "stf storage-plugin-apk --port 3000 --storage-url http://$ip/" "--net=host"
+Run-Docker-Container "storage-plugin-image-3400" "openstf/stf" "stf storage-plugin-image --port 3000 --storage-url http://$ip/" "--net=host"
+Run-Docker-Container "storage-temp-3500" "openstf/stf" "stf storage-temp --port 3000 --save-dir /home/stf" "--net=host"
 Write-Host "All components have been started successfully."

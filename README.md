@@ -1,129 +1,62 @@
-# STF Deployment Services
+## STF Deployment Services (with Docker Compose Integration)
 
 This repository contains a set of modular PowerShell scripts designed to automate the deployment of Smartphone Test Farm (STF) services using Docker on a Windows environment. Each script serves a specific purpose, making it easy to maintain, update, and reuse.
+
+**Additionally, this project now supports deployment using Docker Compose, offering a simpler workflow.**
 
 ## Directory Structure
 
 ```
 deploy_stf/
-├── modules/
-│   ├── Install-Chocolatey.ps1
-│   ├── Install-Tool.ps1
-│   ├── Prepare-Environment.ps1
-│   └── Run-Docker-Container.ps1
 ├── config/
-│   └── nginx.conf.template
-└── deploy_stf.ps1
+│   └── nginx.conf.template
+├── modules/
+│   ├── Install-Chocolatey.ps1
+│   ├── Install-Tool.ps1
+│   ├── Prepare-Environment.ps1
+│   └── Run-Docker-Container.ps1
+├── nginx/
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   ├── nginx.conf
+├── storage-temp/
+│   ├── Dockerfile
+├── deploy_stf.ps1
+└── docker-compose.yml
 ```
 
-- **`deploy_stf.ps1`**: The main script that orchestrates the entire deployment process.
-- **`modules/`**: A folder containing all the helper scripts used by `deploy_stf.ps1` for different tasks.
-- **`config/`**: A folder containing the `nginx.conf.template` configuration file.
+**Changes:**
 
-## Modules
+- `docker-compose.yml` (New): This file defines the Docker services and configurations for your STF deployment.
 
-### 1. Install-Chocolatey.ps1
+## Existing Features
 
-This script checks if Chocolatey is installed on the system. If not, it installs Chocolatey, a package manager for Windows that helps in managing dependencies and installations.
+The core functionalities described previously for `deploy_stf.ps1` and its helper scripts remain the same.
 
-- **Functions**:
-  - `Install-Chocolatey`: Installs Chocolatey if not present, with proper error handling.
+## Using Docker Compose (Recommended)
 
-### 2. Install-Tool.ps1
+**Prerequisites:**
 
-This script provides a function to check for and install various tools needed for STF deployment using Chocolatey. 
+- Docker installed on your system.
 
-- **Functions**:
-  - `Install-Tool`: Takes the tool name and its Chocolatey package name as parameters and installs the tool if it's not already present on the system.
+**Steps:**
 
-### 3. Prepare-Environment.ps1
-
-This script prepares the environment for STF deployment by installing necessary tools, starting Docker Desktop if it is not running, and pulling required Docker images. It also generates the `nginx.conf` file by replacing placeholders in the `nginx.conf.template` file with environment variables.
-
-- **Functions**:
-  - `Prepare-Environment`: Prepares the system environment, installs required tools (ADB, Docker Desktop), starts Docker Desktop, pulls necessary Docker images, and generates `nginx.conf` using environment variables.
-
-### 4. Run-Docker-Container.ps1
-
-This script provides a function to manage Docker containers needed for STF deployment. It removes any existing containers and starts new ones with specified configurations.
-
-- **Functions**:
-  - `Run-Docker-Container`: Takes the container name and Docker command as parameters, removes existing containers, and starts new ones.
-
-## Main Script
-
-### deploy_stf.ps1
-
-This is the main script that orchestrates the STF deployment using the modular scripts located in the `modules` folder.
-
-- **Key Features**:
-  - Accepts `--ip` and `--dns` parameters to set up the environment variables for STF deployment.
-  - Imports and executes functions from the modular scripts to install tools, prepare the environment, and manage Docker containers.
-  - Manages the deployment lifecycle from start to finish.
-  - Utilizes environment variables (`DEPLOY_STF_IP` and `DEPLOY_STF_DNS`) to dynamically generate `nginx.conf` from the template.
-
-## Usage
-
-Run the main script from an elevated PowerShell session (Run as Administrator):
+1. Clone the repository and navigate to the `deploy_stf` directory.
+2. Set up the environment variables required by your STF services (refer to the `docker-compose.yml` file for details). You can do this by creating a `.env` file in the project root directory and defining variables there.
+3. Run the following command to start the STF deployment using Docker Compose:
 
 ```
-cd deploy_stf
-.\deploy_stf.ps1 --ip=192.168.18.27 --dns=192.168.18.1
+docker-compose up -d
 ```
 
-### Parameters:
+This command will build and start the Docker containers defined in `docker-compose.yml`, automating the deployment process.
 
-- `--ip`: The IP address for the STF deployment. Defaults to `192.168.18.27` if not provided.
-- `--dns`: The DNS address for the STF deployment. Defaults to `192.168.18.1` if not provided.
+**Benefits:**
 
-### Environment Variables
+- Simplified workflow with a single command for deployment.
+- Manages dependencies and configurations through `docker-compose.yml`.
+- Portable deployment across environments with Docker.
 
-The script uses environment variables to configure `nginx.conf`:
+## Using the Main Script (Optional)
 
-- `DEPLOY_STF_IP`: IP address for STF, set by the script or passed as a parameter.
-- `DEPLOY_STF_DNS`: DNS address for STF, set by the script or passed as a parameter.
-
-You can set these environment variables manually in PowerShell before running the script:
-
-```powershell
-$env:DEPLOY_STF_IP = "192.168.18.27"
-$env:DEPLOY_STF_DNS = "192.168.18.1"
-```
-
-## How to Run the Scripts
-
-1. Clone the repository to your local machine.
-
-   ```
-   git clone https://github.com/reinskywalker/stf-deployment-services.git
-   cd stf-deployment-services
-   ```
-
-2. Open PowerShell with **Administrator privileges**.
-
-3. Navigate to the `deploy_stf` directory.
-
-4. Run the main script with the desired parameters.
-
-5. Follow the on-screen instructions and logs to ensure a successful deployment.
-
-## Benefits of This Modular Approach
-
-1. **Reusability**: Each script is modular and can be reused across different projects.
-2. **Maintainability**: Update or fix a script independently without affecting others.
-3. **Readability**: Smaller, well-organized scripts are easier to understand and manage.
-
-## Troubleshooting
-
-- If there are issues with installing Chocolatey or any tools, ensure that PowerShell is running with administrative privileges.
-- For Docker-related issues, verify that Docker Desktop is installed and running properly. Restart Docker Desktop if necessary.
-- Check the logs in `C:\ProgramData\chocolatey\logs\chocolatey.log` for more details on Chocolatey installation errors.
-- If you encounter errors related to `nginx.conf.template`, ensure that the file exists in the `config` folder and that the path is correctly specified in `Prepare-Environment.ps1`.
-
-## Contributing
-
-Contributions are welcome! If you'd like to add new features or fix bugs, feel free to open a pull request. Please ensure that your code follows the repository's structure and coding standards.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+The `deploy_stf.ps1` script is still available for advanced configurations or customization. Refer to the existing instructions and parameters for detailed usage.

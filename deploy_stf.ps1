@@ -17,93 +17,78 @@ if (-not $dns) {
     Write-Host "Using provided DNS address: $dns"
 }
 
-[System.Environment]::SetEnvironmentVariable("STF_IP", $ip, [System.EnvironmentVariableTarget]::Process)
-[System.Environment]::SetEnvironmentVariable("DNS_ADDRESS", $dns, [System.EnvironmentVariableTarget]::Process)
+[System.Environment]::SetEnvironmentVariable("DEPLOY_STF_IP", $ip, [System.EnvironmentVariableTarget]::Process)
+[System.Environment]::SetEnvironmentVariable("DEPLOY_STF_DNS", $dns, [System.EnvironmentVariableTarget]::Process)
+[System.Environment]::SetEnvironmentVariable("PUBLIC_IP", $ip, [System.EnvironmentVariableTarget]::Process)
 
 . .\modules\Install-Chocolatey.ps1
 . .\modules\Install-Tool.ps1
 . .\modules\Prepare-Environment.ps1
 . .\modules\Run-Docker-Container.ps1
 
+if ($env:OS -eq 'Windows_NT') {
+    if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
+        Write-Host "Windows detected and docker-compose is available — using docker-compose up -d"
+        & docker-compose up -d
+        exit 0
+    } else {
+        Write-Host "Windows detected but docker-compose not found; continuing with docker run flow (may require manual adjustments)."
+    }
+}
+
 if (-not (Test-Path "env.ok")) {
     Prepare-Environment -ip $ip -dns $dns
 }
 
 try {
-    Write-Host "Starting ADB server..."
-    Start-Process adb -ArgumentList "start-server" -NoNewWindow -Wait
-    Start-Sleep -Seconds 5
-    $adbStatus = Get-Process adb -ErrorAction SilentlyContinue
-
-    if ($adbStatus) {
-        Write-Host "ADB server started successfully."
+    Write-Host "Ensuring ADB is available..."
+    if (-not (Get-Command adb -ErrorAction SilentlyContinue)) {
+        Write-Host "ADB not found in PATH. Ensure it is installed and available."
     } else {
-        throw "Failed to verify ADB server start."
+        Start-Process adb -ArgumentList "start-server" -NoNewWindow -Wait
+        Start-Sleep -Seconds 2
+        Write-Host "ADB server started (or already running)."
     }
 } catch {
-    Write-Host "Failed to start ADB server. Ensure ADB is installed correctly."
-    Write-Host $_.Exception.Message
-    exit 1
+    Write-Host "ADB start failed: $($_.Exception.Message)"
 }
 
 function Test-DockerContainerExists {
     param (
         [string]$containerName
     )
-    $result = docker ps -a --filter "name=$containerName" --format "{{.Names}}"
+    $result = (& docker ps -a --filter "name=$containerName" --format "{{.Names}}")
     return $result -ne ""
 }
 
-function Run-Docker-Container {
-    param (
-        [string]$name,
-        [string]$image,
-        [string[]]$options,
-        [string[]]$cmdArgs = @()
-    )
-
-    try {
-        if (Test-DockerContainerExists -containerName $name) {
-            Write-Host "Removing existing Docker container: $name"
-            docker rm -f $name
-        } else {
-            Write-Host "No existing container named $name. Skipping removal."
-        }
-
-        Write-Host "Running Docker container: $name"
-        docker run -d --name $name @options $image @cmdArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to run Docker container: $name"
-        }
-    } catch {
-        Write-Host $_.Exception.Message
-        exit 1
+function Convert-PathForDocker {
+    param([string]$path)
+    if (-not $path) { return $path }
+    $p = $path -replace '\\','/'
+    if ($p -match '^[A-Za-z]:') {
+        $drive = $p.Substring(0,1).ToLower()
+        $p = "/$drive" + $p.Substring(2)
     }
+    return $p
 }
 
 Write-Host "Starting Docker containers..."
 
-Run-Docker-Container "rethinkdb" "rethinkdb" @("--net=host") @("rethinkdb", "--bind", "all", "--cache-size", "8192", "--http-port", "8090")
+Run-Docker-Container "rethinkdb" "rethinkdb" @() @("rethinkdb", "--bind", "all", "--cache-size", "8192", "--http-port", "8090")
 
-$currentLocation = Get-Location
-
-$nginxConfigPath = (Resolve-Path "$PSScriptRoot\nginx.conf").Path
-$nginxConfigPath = $nginxConfigPath -replace '\\', '/' 
-$nginxConfigPath = $nginxConfigPath -replace '^[A-Za-z]:', { "/$($matches[0].Substring(0, 1).ToLower())" }
-$nginxConfigPath = $nginxConfigPath.Trim()
-$nginxConfigPath = $nginxConfigPath.ToLower()
-
-if ($nginxConfigPath -match '^\s') {
-    Write-Host "Invalid characters detected in the path: '$nginxConfigPath'" -ForegroundColor Red
+$nginxWindowsPath = (Resolve-Path (Join-Path $PSScriptRoot 'nginx\nginx.conf')).Path
+$nginxConfigPathForDocker = Convert-PathForDocker $nginxWindowsPath
+if ($nginxWindowsPath -match '^\s') {
+    Write-Host "Invalid characters detected in the path: '$nginxWindowsPath'" -ForegroundColor Red
     exit 1
 }
+Write-Host "Using nginx config path: '$nginxWindowsPath'"
+$nginxVolumeOption = "-v `"$nginxConfigPathForDocker`":/etc/nginx/nginx.conf:ro"
+Run-Docker-Container "nginx" "nginx" @($nginxVolumeOption) @()
 
-Write-Host "Using nginx config path: '$nginxConfigPath'"
-$nginxVolumeOption = "-v ${nginxConfigPath}:/etc/nginx/nginx.conf:ro"
-Write-Host "Constructed Docker volume option: '$nginxVolumeOption'"
-Run-Docker-Container "nginx" "nginx" @($nginxVolumeOption, "--net=host")
-Run-Docker-Container "stf-migrate" "openstf/stf" @("--net=host") @("stf", "migrate")
-Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf" @("--net=host") @("stf", "storage-plugin-apk", "--port", "3000", "--storage-url", "http://$ip/")
-Run-Docker-Container "storage-plugin-image-3400" "openstf/stf" @("--net=host") @("stf", "storage-plugin-image", "--port", "3000", "--storage-url", "http://$ip/")
-Run-Docker-Container "storage-temp-3500" "openstf/stf" @("--net=host") @("stf", "storage-temp", "--port", "3000", "--save-dir", "/home/stf")
-Write-Host "All components have been started successfully."
+Run-Docker-Container "stf-migrate" "openstf/stf" @() @("stf", "migrate")
+Run-Docker-Container "storage-plugin-apk-3300" "openstf/stf" @() @("stf", "storage-plugin-apk", "--port", "3000", "--storage-url", "http://$ip/")
+Run-Docker-Container "storage-plugin-image-3400" "openstf/stf" @() @("stf", "storage-plugin-image", "--port", "3000", "--storage-url", "http://$ip/")
+Run-Docker-Container "storage-temp-3500" "openstf/stf" @() @("stf", "storage-temp", "--port", "3000", "--save-dir", "/home/stf")
+
+Write-Host "All components have been started (or attempted)."

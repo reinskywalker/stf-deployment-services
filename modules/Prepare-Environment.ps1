@@ -7,12 +7,17 @@ function Prepare-Environment {
     if (-not $ip) {
         $ip = "192.168.18.27"
         [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_IP", $ip, [System.EnvironmentVariableTarget]::User)
+        [System.Environment]::SetEnvironmentVariable("PUBLIC_IP", $ip, [System.EnvironmentVariableTarget]::User)
     }
 
     if (-not $dns) {
         $dns = "192.168.18.1"
         [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_DNS", $dns, [System.EnvironmentVariableTarget]::User)
     }
+
+    [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_IP", $ip, [System.EnvironmentVariableTarget]::Process)
+    [System.Environment]::SetEnvironmentVariable("DEPLOY_STF_DNS", $dns, [System.EnvironmentVariableTarget]::Process)
+    [System.Environment]::SetEnvironmentVariable("PUBLIC_IP", $ip, [System.EnvironmentVariableTarget]::Process)
 
     Install-Chocolatey
 
@@ -43,11 +48,13 @@ function Prepare-Environment {
     }
 
     try {
+        $outPath = Join-Path $PSScriptRoot '..\nginx\nginx.conf'
         Get-Content .\config\nginx.conf.template | ForEach-Object {
-            $_ -replace '__IP_ADDRESS__', $env:DEPLOY_STF_IP -replace '__DNS_ADDRESS__', $env:DEPLOY_STF_DNS
-        } | Set-Content nginx.conf
+            $_ -replace '__IP_ADDRESS__', $ip -replace '__DNS_ADDRESS__', $dns
+        } | Set-Content $outPath
+        Write-Host "Generated nginx config at: $outPath"
     } catch {
-        Write-Host "Failed to generate nginx configuration."
+        Write-Host "Failed to generate nginx configuration: $($_.Exception.Message)"
         exit 1
     }
 

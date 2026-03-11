@@ -43,6 +43,7 @@ The core functionalities described previously for `deploy_stf.ps1` and its helpe
 
 1. Clone the repository and navigate to the `deploy_stf` directory.
 2. Set up the environment variables required by your STF services (refer to the `docker-compose.yml` file for details). You can do this by creating a `.env` file in the project root directory and defining variables there.
+	- A sample file is included as `.env.example`. Copy it to `.env` and edit values like `PUBLIC_IP` and `SECRET` before running.
 3. Run the following command to start the STF deployment using Docker Compose:
 
 ```
@@ -60,3 +61,7 @@ This command will build and start the Docker containers defined in `docker-compo
 ## Using the Main Script (Optional)
 
 The `deploy_stf.ps1` script is still available for advanced configurations or customization. Refer to the existing instructions and parameters for detailed usage.
+
+Notes:
+- On Windows the script will prefer `docker-compose` if available. If you run the script without `docker-compose`, `deploy_stf.ps1` will attempt a `docker run` flow but some options (host networking, USB mounts) may not work on Docker for Windows.
+- For USB passthrough and host networking prefer a native Linux host or WSL2 with Docker configured appropriately.
